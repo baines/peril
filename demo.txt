@@ -1,0 +1,22 @@
+(import "libSDL2.so")
+(srand (time 0))
+
+(let W 640)
+(let H 480)
+(let win (SDL_CreateWindow "hello world" 0 0 W H 0))
+(let rdr (SDL_CreateRenderer win -1 0))
+
+(SDL_SetRenderDrawColor rdr 20 0 20)
+(SDL_RenderClear rdr)
+(SDL_SetRenderDrawColor rdr 255 255 255)
+
+(while 1 [
+    (let x0 (% (rand) W))
+    (let x1 (% (rand) W))
+    (let y0 (% (rand) H))
+    (let y1 (% (rand) H))
+
+    (SDL_RenderDrawLine rdr x0 y0 x1 y1)
+    (SDL_RenderPresent rdr)
+    (usleep 16667)
+])
