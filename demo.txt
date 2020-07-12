@@ -16,6 +16,8 @@
     (let y0 (% (rand) H))
     (let y1 (% (rand) H))
 
+    (SDL_SetRenderDrawColor rdr (% (rand) 255) (% (rand) 255) (% (rand) 255))
+
     (SDL_RenderDrawLine rdr x0 y0 x1 y1)
     (SDL_RenderPresent rdr)
     (usleep 16667)

@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <signal.h>
+#include <unistd.h>
 #include "sb.h"
 #include "hashing.h"
 
@@ -22,9 +23,9 @@ struct atom {
         char*        str;
         intmax_t     num;
         intptr_t     val;
-        struct atom* car;
     };
     struct atom* cdr;
+    struct atom* car;
     char*        sym;
 };
 
@@ -44,7 +45,7 @@ static inline bool var_cmp(const struct var* v, const char* name) {
     return strcmp(v->name, name) == 0;
 }
 
-static struct atom* dup(struct atom* in) {
+static struct atom* adup(struct atom* in) {
     if(in == NULL)
         return NULL;
 
@@ -141,7 +142,9 @@ static intptr_t eval_func(const char* sym, struct atom* args) {
     } else if(strcmp(sym, "%") == 0) {
         assert(args);
 
-        return eval_atom(args) % eval_atom(args->cdr);
+        intptr_t a = eval_atom(args);
+        intptr_t b = eval_atom(args->cdr);
+        return a % b;
 
     } else if(strcmp(sym, "let") == 0) {
         assert(args);
@@ -200,6 +203,8 @@ static intptr_t eval_func(const char* sym, struct atom* args) {
                     exit(1);
                 }
                 a->val = v->value;
+            } else if(a->type == A_XLIST) {
+                a->val = eval_atom(a);
             }
         }
 
@@ -300,7 +305,7 @@ static struct atom* read_atom(int run_eval) {
         a.sym = read_sym();
     }
 
-    return dup(&a);
+    return adup(&a);
 }
 
 static struct atom* read_atom_list_inner(char terminator, int run_eval) {
@@ -313,7 +318,7 @@ static struct atom* read_atom_list_inner(char terminator, int run_eval) {
             continue;
 
         if(c == terminator) {
-            return dup(head);
+            return adup(head);
         }
 
         ungetc(c, stdin);
@@ -336,11 +341,11 @@ static struct atom* read_atom_list(int run_eval) {
     return read_atom_list_inner(']', run_eval);
 }
 
-static void print_atom_list(struct atom* a);
+static void print_atom_list(struct atom* a, int depth);
 
-static void print_atom(struct atom* a) {
+static void print_atom(struct atom* a, int depth) {
     if(a == NULL) {
-        fputs("<NIL>", stdout);
+        puts("");
         return;
     }
 
@@ -357,9 +362,10 @@ static void print_atom(struct atom* a) {
             printf("%" PRIiMAX, a->num);
         } break;
 
-        case A_LIST: {
-            printf("[");
-            print_atom_list(a->car);
+        case A_LIST:
+        case A_XLIST: {
+            printf("\n%*s[", depth, "");
+            print_atom_list(a->car, depth+2);
             printf("]");
         } break;
 
@@ -369,11 +375,11 @@ static void print_atom(struct atom* a) {
     }
 }
 
-static void print_atom_list(struct atom* a) {
-    print_atom(a);
+static void print_atom_list(struct atom* a, int depth) {
+    print_atom(a, depth);
     while(a && (a = a->cdr)) {
         printf(" ");
-        print_atom(a);
+        print_atom(a, depth);
     }
 }
 
@@ -381,16 +387,23 @@ static void exitsig(int s) {
     exit(0);
 }
 
-int main(void){
-    struct atom* a;
+int main(int argc, char** argv){
 
     inso_ht_init(&symtab, 32, sizeof(struct var), (inso_ht_hash_fn)&var_hash);
     signal(SIGINT, &exitsig);
 
-    do {
-        a = read_atom(1);
-    } while(!feof(stdin));
+    int dump = 0;
 
-    //print_atom(a);
-    //puts("");
+    int arg;
+    while((arg = getopt(argc, argv, "d")) != -1) {
+        if(arg == 'd')
+            dump = 1;
+    }
+
+    do {
+        struct atom* a = read_atom(!dump);
+        if(dump) {
+            print_atom(a, 0);
+        }
+    } while(!feof(stdin));
 }
